@@ -4,20 +4,18 @@ import (
     "fmt"
     "net/http"
     "os"
-    "sort"
     "strconv"
     "time"
 )
 
-func req(url string, ch chan int) {
+func req(url string, ch chan bool) {
     
     //Make one request to url and counting milliseconds
-    start := time.Now()
     resp, err := http.Get(url)
-    t := int(time.Since(start).Milliseconds())
+    t := false
     defer resp.Body.Close()
     if err != nil {
-        t = -1
+        t = true
     }
     ch <- t
     
@@ -33,10 +31,10 @@ func min(x int, y int) int {
 func reqs(url string, nreq int, concurrency int) {
     
     //Make nreq requests with concurrency to url
-    timereq := make([]int, nreq)
-    ch := make(chan int)
+    err := 0
+    ch := make(chan bool)
     start := time.Now()
-    for i := 0; i < nreq; {
+    for i := 0; i < nreq; i += concurrency {
         conc := min(concurrency, nreq-i)
         // Make conc concurrent requests
         for j := 0; j < conc; j++ {
@@ -44,13 +42,15 @@ func reqs(url string, nreq int, concurrency int) {
         }
         // Wait all requests and collect results
         for j := 0; j < conc; j++ {
-            timereq[i] = <- ch
-            i++
+            if <- ch {
+                err++
+            }
         }
     }
     elapsed := float64(time.Since(start).Milliseconds())
-    sort.Ints(timereq[:])
     fmt.Println("Time taken for tests: ", elapsed/1000, " seconds")
+    fmt.Println("Complete requests: ", nreq-err)
+    fmt.Println("Failed requests: ", err)
     fmt.Println("TPS: ", float64(nreq)/(elapsed/1000), " [#/sec] (mean)")
     fmt.Println("Time per request: ", elapsed*float64(concurrency)/float64(nreq), " [ms] (mean)")
     fmt.Println("Time per request: ", elapsed/float64(nreq), "[ms] (mean, across all concurrent requests)")
