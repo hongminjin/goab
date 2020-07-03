@@ -8,16 +8,20 @@ import (
     "time"
 )
 
-func req(url string, ch chan bool) {
+func req(url string, ch chan bool, client *http.Client, keepalive bool) {
     
-    //Make one request to url and counting milliseconds
-    resp, err := http.Get(url)
-    t := false
+    //Make one request to url
+    req, err := http.NewRequest("GET", url, nil)
+    if keepalive {
+        req.Header.Set("Connection", "keep-alive")
+    }
+    resp, err := client.Do(req)
+    e := false
     defer resp.Body.Close()
     if err != nil {
-        t = true
+        e = true
     }
-    ch <- t
+    ch <- e
     
 }
 
@@ -28,9 +32,16 @@ func min(x int, y int) int {
     return y
 }
 
-func reqs(url string, nreq int, concurrency int) {
+func reqs(url string, nreq int, concurrency int, keepalive bool) {
     
     //Make nreq requests with concurrency to url
+    tr := &http.Transport{
+        DisableKeepAlives: !keepalive,
+    }
+    clients := make([]*http.Client, concurrency)
+    for i := 0; i < concurrency; i++ {
+        clients[i] = &http.Client{Transport: tr}
+    }
     err := 0
     ch := make(chan bool)
     start := time.Now()
@@ -38,7 +49,7 @@ func reqs(url string, nreq int, concurrency int) {
         conc := min(concurrency, nreq-i)
         // Make conc concurrent requests
         for j := 0; j < conc; j++ {
-            go req(url, ch)
+            go req(url, ch, clients[j], keepalive)
         }
         // Wait all requests and collect results
         for j := 0; j < conc; j++ {
@@ -69,17 +80,13 @@ func main() {
             keepalive = true
         } else if arg == "-c" {
             concurrency,_ = strconv.Atoi(os.Args[i+1])
-            i = i+1
+            i++
         } else if arg == "-n" {
             nreq,_ = strconv.Atoi(os.Args[i+1])
-            i = i+1
+            i++
         }
-        i = i+1
+        i++
     }
     
-    if keepalive {
-        fmt.Println("keepalive")
-    }
-    
-    reqs(url, nreq, concurrency)
+    reqs(url, nreq, concurrency, keepalive)
 }
