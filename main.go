@@ -25,46 +25,60 @@ func req(url string, client *http.Client, keepalive bool) bool {
 
 }
 
-// Make n requests to url and send the number of errors to channel ch
-func work(url string, keepalive bool, ch chan int, n int) {
+// Make requests to url and send the number of errors to channel cerr
+func work(url string, keepalive bool, cerr chan int, ch chan bool) {
 
     tr := &http.Transport{
         DisableKeepAlives: !keepalive,
     }
-    client := &http.Client{Transport: tr}
-    err := 0
-    for i := 0; i < n; i++ {
+    client := &http.Client{Transport: tr} // client to use
+    err := 0 // total number of errors
+
+    // receive jobs from ch
+    v, ok := <- ch
+    for ; v && ok; {
         e := req(url, client, keepalive)
         if e {
             err++
         }
+        v, ok = <- ch
     }
-    ch <- err
+    cerr <- err
 
+}
+
+func min(x int, y int) int {
+    if x < y {
+        return x
+    }
+    return y
 }
 
 // Make nreq requests with concurrency to url and print results
 func reqs(url string, nreq int, concurrency int, keepalive bool) {
 
-    err := 0
-    ch := make(chan int)
-    n := make([]int, concurrency)
-    for i := 0; i < concurrency; i++ {
-        j := 0
-        if i < nreq%concurrency {
-            j = 1
-        }
-        n[i] = nreq/concurrency + j
+    err := 0 // total number of errors
+    cerr := make(chan int) // channel to collect errors
+    ch := make(chan bool, concurrency) // channel to assign jobs
+    conc := min(nreq, concurrency) // number of goroutines
+
+    // create conc goroutines to do the job
+    for i := 0; i < conc; i++ {
+        go work(url, keepalive, cerr, ch)
     }
 
     start := time.Now()
-    // create concurrency goroutines to do the job
-    for i := 0; i < concurrency; i++ {
-        go work(url, keepalive, ch, n[i])
+    // create jobs
+    for i := 0; i < nreq; i++ {
+        ch <- true
     }
+    for i := 0; i < conc; i++ {
+        ch <- false
+    }
+    close(ch)
     // wait all goroutines and collect results by channel ch
-    for i := 0; i < concurrency; i++ {
-        e := <- ch
+    for i := 0; i < conc; i++ {
+        e := <- cerr
         err += e
     }
     elapsed := float64(time.Since(start).Milliseconds())
@@ -73,7 +87,7 @@ func reqs(url string, nreq int, concurrency int, keepalive bool) {
     fmt.Println("Complete requests: ", nreq-err)
     fmt.Println("Failed requests: ", err)
     fmt.Println("TPS: ", float64(nreq)/(elapsed/1000), " [#/sec] (mean)")
-    fmt.Println("Time per request: ", elapsed*float64(concurrency)/float64(nreq), " [ms] (mean)")
+    fmt.Println("Time per request: ", elapsed*float64(conc)/float64(nreq), " [ms] (mean)")
     fmt.Println("Time per request: ", elapsed/float64(nreq), "[ms] (mean, across all concurrent requests)")
 
 }
