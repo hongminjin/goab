@@ -8,7 +8,7 @@ import (
     "time"
 )
 
-func req(url string, ch chan bool, client *http.Client, keepalive bool) {
+func req(url string, client *http.Client, keepalive bool) bool {
     
     //Make one request to url
     req, err := http.NewRequest("GET", url, nil)
@@ -21,42 +21,52 @@ func req(url string, ch chan bool, client *http.Client, keepalive bool) {
     if err != nil {
         e = true
     }
-    ch <- e
+    return e
     
 }
 
-func min(x int, y int) int {
+func work(url string, keepalive bool, ch chan int, n int) {
+    tr := &http.Transport{
+        DisableKeepAlives: !keepalive,
+    }
+    client := &http.Client{Transport: tr}
+    err := 0
+    for i := 0; i < n; i++ {
+        e := req(url, client, keepalive)
+        if e {
+            err++
+        }
+    }
+    ch <- err
+}
+
+/*func min(x int, y int) int {
     if x < y {
         return x
     }
     return y
-}
+}*/
 
 func reqs(url string, nreq int, concurrency int, keepalive bool) {
     
     //Make nreq requests with concurrency to url
-    tr := &http.Transport{
-        DisableKeepAlives: !keepalive,
-    }
-    clients := make([]*http.Client, concurrency)
-    for i := 0; i < concurrency; i++ {
-        clients[i] = &http.Client{Transport: tr}
-    }
     err := 0
-    ch := make(chan bool)
+    ch := make(chan int)
+    n := make([]int, concurrency)
+    for i := 0; i < concurrency; i++ {
+        j := 0
+        if i < nreq%concurrency {
+            j = 1
+        }
+        n[i] = nreq/concurrency + j
+    }
     start := time.Now()
-    for i := 0; i < nreq; i += concurrency {
-        conc := min(concurrency, nreq-i)
-        // Make conc concurrent requests
-        for j := 0; j < conc; j++ {
-            go req(url, ch, clients[j], keepalive)
-        }
-        // Wait all requests and collect results
-        for j := 0; j < conc; j++ {
-            if <- ch {
-                err++
-            }
-        }
+    for i := 0; i < concurrency; i++ {
+        go work(url, keepalive, ch, n[i])
+    }
+    for i := 0; i < concurrency; i++ {
+        e := <- ch
+        err += e
     }
     elapsed := float64(time.Since(start).Milliseconds())
     fmt.Println("Time taken for tests: ", elapsed/1000, " seconds")
