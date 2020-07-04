@@ -76,7 +76,7 @@ func reqs(url string, nreq int, concurrency int, keepalive bool) {
         ch <- false
     }
     close(ch)
-    // wait all goroutines and collect results by channel ch
+    // wait all goroutines and collect results by channel cerr
     for i := 0; i < conc; i++ {
         e := <- cerr
         err += e
