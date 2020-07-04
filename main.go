@@ -8,9 +8,9 @@ import (
     "time"
 )
 
+// Make one request to url using client and return if there is an error
 func req(url string, client *http.Client, keepalive bool) bool {
-    
-    //Make one request to url
+
     req, err := http.NewRequest("GET", url, nil)
     if keepalive {
         req.Header.Set("Connection", "keep-alive")
@@ -22,10 +22,12 @@ func req(url string, client *http.Client, keepalive bool) bool {
         e = true
     }
     return e
-    
+
 }
 
+// Make n requests to url and send the number of errors to channel ch
 func work(url string, keepalive bool, ch chan int, n int) {
+
     tr := &http.Transport{
         DisableKeepAlives: !keepalive,
     }
@@ -38,18 +40,12 @@ func work(url string, keepalive bool, ch chan int, n int) {
         }
     }
     ch <- err
+
 }
 
-/*func min(x int, y int) int {
-    if x < y {
-        return x
-    }
-    return y
-}*/
-
+// Make nreq requests with concurrency to url and print results
 func reqs(url string, nreq int, concurrency int, keepalive bool) {
-    
-    //Make nreq requests with concurrency to url
+
     err := 0
     ch := make(chan int)
     n := make([]int, concurrency)
@@ -60,21 +56,26 @@ func reqs(url string, nreq int, concurrency int, keepalive bool) {
         }
         n[i] = nreq/concurrency + j
     }
+
     start := time.Now()
+    // create concurrency goroutines to do the job
     for i := 0; i < concurrency; i++ {
         go work(url, keepalive, ch, n[i])
     }
+    // wait all goroutines and collect results by channel ch
     for i := 0; i < concurrency; i++ {
         e := <- ch
         err += e
     }
     elapsed := float64(time.Since(start).Milliseconds())
+
     fmt.Println("Time taken for tests: ", elapsed/1000, " seconds")
     fmt.Println("Complete requests: ", nreq-err)
     fmt.Println("Failed requests: ", err)
     fmt.Println("TPS: ", float64(nreq)/(elapsed/1000), " [#/sec] (mean)")
     fmt.Println("Time per request: ", elapsed*float64(concurrency)/float64(nreq), " [ms] (mean)")
     fmt.Println("Time per request: ", elapsed/float64(nreq), "[ms] (mean, across all concurrent requests)")
+
 }
 
 func main() {
