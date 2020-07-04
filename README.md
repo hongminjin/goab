@@ -22,8 +22,8 @@ go build -o server server.go
 ```
 Where `url` is the url to test, available parameters are:
 * `-k` to enable HTTP KeepAlive
-* `-n *n*` to make *n* requests
-* `-c *c*` to specify concurrency (number of multiple requests to perform at a time)
+* `-n nreq` to make *nreq* requests
+* `-c conc` to specify concurrency (number of multiple requests to perform at a time) as *conc*
 
 To test localhost, run
 ```
