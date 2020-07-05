@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "io/ioutil"
     "net/http"
     "os"
     "strconv"
@@ -18,6 +19,7 @@ func req(url string, client *http.Client, keepalive bool) bool {
     resp, err := client.Do(req)
     e := false
     defer resp.Body.Close()
+    _, err = ioutil.ReadAll(resp.Body)
     if err != nil {
         e = true
     }
