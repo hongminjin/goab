@@ -88,9 +88,9 @@ func reqs(url string, nreq int, concurrency int, keepalive bool) {
     fmt.Println("Time taken for tests: ", elapsed/1000, " seconds")
     fmt.Println("Complete requests: ", nreq-err)
     fmt.Println("Failed requests: ", err)
-    fmt.Println("TPS: ", float64(nreq)/(elapsed/1000), " [#/sec] (mean)")
-    fmt.Println("Time per request: ", elapsed*float64(conc)/float64(nreq), " [ms] (mean)")
-    fmt.Println("Time per request: ", elapsed/float64(nreq), "[ms] (mean, across all concurrent requests)")
+    fmt.Println("TPS: ", float64(nreq-err)/(elapsed/1000), " [#/sec] (mean)")
+    fmt.Println("Time per request: ", elapsed*float64(conc)/float64(nreq-err), " [ms] (mean)")
+    fmt.Println("Time per request: ", elapsed/float64(nreq-err), "[ms] (mean, across all concurrent requests)")
 
 }
 
